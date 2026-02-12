@@ -11,6 +11,9 @@ class HolonsTest {
         assertEquals("tcp", Transport.scheme("tcp://:9090"))
         assertEquals("unix", Transport.scheme("unix:///tmp/x.sock"))
         assertEquals("stdio", Transport.scheme("stdio://"))
+        assertEquals("mem", Transport.scheme("mem://"))
+        assertEquals("ws", Transport.scheme("ws://127.0.0.1:8080/grpc"))
+        assertEquals("wss", Transport.scheme("wss://example.com:443/grpc"))
     }
 
     @Test fun defaultUri() {
@@ -18,9 +21,32 @@ class HolonsTest {
     }
 
     @Test fun tcpListen() {
-        val ss = Transport.listen("tcp://127.0.0.1:0")
-        assertTrue(ss.localPort > 0)
-        ss.close()
+        val lis = Transport.listen("tcp://127.0.0.1:0")
+        val tcp = lis as Transport.Listener.Tcp
+        assertTrue(tcp.socket.localPort > 0)
+        tcp.socket.close()
+    }
+
+    @Test fun parseUriWss() {
+        val parsed = Transport.parseURI("wss://example.com:8443")
+        assertEquals("wss", parsed.scheme)
+        assertEquals("example.com", parsed.host)
+        assertEquals(8443, parsed.port)
+        assertEquals("/grpc", parsed.path)
+        assertTrue(parsed.secure)
+    }
+
+    @Test fun stdioAndMemListenVariants() {
+        assertEquals(Transport.Listener.Stdio, Transport.listen("stdio://"))
+        assertEquals(Transport.Listener.Mem, Transport.listen("mem://"))
+    }
+
+    @Test fun wsListenVariant() {
+        val ws = Transport.listen("ws://127.0.0.1:8080/holon") as Transport.Listener.WS
+        assertEquals("127.0.0.1", ws.host)
+        assertEquals(8080, ws.port)
+        assertEquals("/holon", ws.path)
+        assertTrue(!ws.secure)
     }
 
     @Test fun unsupportedUri() {
