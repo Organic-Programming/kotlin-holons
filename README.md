@@ -14,8 +14,8 @@ status: draft
 ---
 # kotlin-holons
 
-**Kotlin SDK for Organic Programming** — transport, serve, and identity
-utilities for building holons in Kotlin.
+**Kotlin SDK for Organic Programming** — transport, serve, identity,
+and Holon-RPC client utilities for building holons in Kotlin.
 
 ## Test
 
@@ -30,6 +30,7 @@ JAVA_HOME=/opt/homebrew/opt/openjdk@21 gradle test -Dorg.gradle.java.home=/opt/h
 | `Transport` | `parseURI(uri)`, `listen(uri)`, `scheme(uri)` |
 | `Serve` | `parseFlags(args)` |
 | `Identity` | `parseHolon(path)` |
+| `HolonRPCClient` | `connect(url)`, `invoke(method, params)`, `register(method, handler)`, `close()` |
 
 ## Transport support
 
@@ -48,6 +49,7 @@ Implemented parity:
 
 - URI parsing and listener dispatch semantics
 - Native runtime listener for `tcp://`
+- Holon-RPC client protocol support over `ws://` / `wss://`
 - Standard serve flag parsing
 - HOLON identity parsing
 
