@@ -28,11 +28,11 @@ tasks.test {
 }
 
 tasks.withType<JavaCompile>().configureEach {
-    options.release.set(23)
+    options.release.set(21)
 }
 
 tasks.withType<KotlinJvmCompile>().configureEach {
     compilerOptions {
-        jvmTarget.set(JvmTarget.JVM_23)
+        jvmTarget.set(JvmTarget.JVM_21)
     }
 }

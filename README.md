@@ -37,9 +37,9 @@ JAVA_HOME=/opt/homebrew/opt/openjdk@21 gradle test -Dorg.gradle.java.home=/opt/h
 | Scheme | Support |
 |--------|---------|
 | `tcp://<host>:<port>` | Bound server socket (`Transport.Listener.Tcp`) |
-| `unix://<path>` | Parsed; runtime binding requires Unix-domain capable gRPC stack |
+| `unix://<path>` | Native runtime listener + dial (`Transport.Listener.Unix`, `Transport.dialUnix`) |
 | `stdio://` | Listener marker (`Transport.Listener.Stdio`) |
-| `mem://` | Listener marker (`Transport.Listener.Mem`) |
+| `mem://` | Native in-process listener + dial (`Transport.Listener.Mem`, `Transport.memDial`) |
 | `ws://<host>:<port>` | Listener metadata (`Transport.Listener.WS`) |
 | `wss://<host>:<port>` | Listener metadata (`Transport.Listener.WS`) |
 
@@ -49,17 +49,16 @@ Implemented parity:
 
 - URI parsing and listener dispatch semantics
 - Native runtime listener for `tcp://`
+- Native runtime listener + dial for `unix://`
+- Native in-process listener + dial for `mem://`
 - Holon-RPC client protocol support over `ws://` / `wss://`
 - Standard serve flag parsing
 - HOLON identity parsing
 
 Not currently achievable in this minimal Kotlin core (justified gaps):
 
-- `unix://` native runtime binding:
-  - Requires a Unix-domain capable Kotlin/JVM gRPC runtime stack (typically Netty native transport).
-  - This SDK intentionally stays on pure JVM socket primitives.
-- `stdio://` and `mem://` runtime listeners:
-  - gRPC Kotlin/Java does not expose official stdio/memory transports equivalent to Go `net.Listener` patterns.
+- `stdio://` runtime listener:
+  - gRPC Kotlin/Java does not expose an official stdio transport equivalent to Go `net.Listener` patterns.
 - `ws://` / `wss://` runtime listener parity:
   - No official WebSocket server transport for standard gRPC HTTP/2 framing in the core stack.
   - Exposed as metadata only.

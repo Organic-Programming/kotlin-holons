@@ -1,6 +1,8 @@
 package org.organicprogramming.holons
 
 import java.io.File
+import java.nio.ByteBuffer
+import java.nio.charset.StandardCharsets
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -38,7 +40,66 @@ class HolonsTest {
 
     @Test fun stdioAndMemListenVariants() {
         assertEquals(Transport.Listener.Stdio, Transport.listen("stdio://"))
-        assertEquals(Transport.Listener.Mem, Transport.listen("mem://"))
+        assertTrue(Transport.listen("mem://") is Transport.Listener.Mem)
+    }
+
+    @Test fun unixListenAndDialRoundTrip() {
+        val path = File.createTempFile("holons-kotlin", ".sock").absolutePath
+        File(path).delete()
+        val uri = "unix://$path"
+
+        val lis = Transport.listen(uri) as Transport.Listener.Unix
+        val serverError = arrayOfNulls<Throwable>(1)
+
+        val server = Thread {
+            try {
+                lis.channel.accept().use { accepted ->
+                    val input = ByteBuffer.allocate(4)
+                    while (input.hasRemaining()) {
+                        accepted.read(input)
+                    }
+                    input.flip()
+                    while (input.hasRemaining()) {
+                        accepted.write(input)
+                    }
+                }
+            } catch (t: Throwable) {
+                serverError[0] = t
+            }
+        }
+        server.start()
+
+        Transport.dialUnix(uri).use { client ->
+            client.write(ByteBuffer.wrap("ping".toByteArray(StandardCharsets.UTF_8)))
+            val out = ByteBuffer.allocate(4)
+            while (out.hasRemaining()) {
+                client.read(out)
+            }
+            assertEquals("ping", String(out.array(), StandardCharsets.UTF_8))
+        }
+
+        server.join(3000)
+        lis.channel.close()
+        serverError[0]?.let { throw AssertionError("unix server failed", it) }
+    }
+
+    @Test fun memListenAndDialRoundTrip() {
+        val lis = Transport.listen("mem://") as Transport.Listener.Mem
+        Transport.memDial(lis).use { client ->
+            lis.runtime.accept(1000).use { server ->
+                client.output.write("hola".toByteArray(StandardCharsets.UTF_8))
+                client.output.flush()
+
+                val inbound = server.input.readNBytes(4)
+                assertEquals("hola", String(inbound, StandardCharsets.UTF_8))
+
+                server.output.write(inbound)
+                server.output.flush()
+
+                val out = client.input.readNBytes(4)
+                assertEquals("hola", String(out, StandardCharsets.UTF_8))
+            }
+        }
     }
 
     @Test fun wsListenVariant() {

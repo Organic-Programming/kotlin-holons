@@ -1,7 +1,17 @@
 package org.organicprogramming.holons
 
+import java.io.InputStream
+import java.io.OutputStream
 import java.net.InetSocketAddress
 import java.net.ServerSocket
+import java.net.StandardProtocolFamily
+import java.net.UnixDomainSocketAddress
+import java.nio.channels.ServerSocketChannel
+import java.nio.channels.SocketChannel
+import java.nio.file.Files
+import java.nio.file.Path
+import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.TimeUnit
 
 /** URI-based listener factory for gRPC servers. */
 object Transport {
@@ -18,8 +28,9 @@ object Transport {
 
     sealed interface Listener {
         data class Tcp(val socket: ServerSocket) : Listener
+        data class Unix(val channel: ServerSocketChannel, val path: String) : Listener
         data object Stdio : Listener
-        data object Mem : Listener
+        data class Mem(val runtime: MemListener) : Listener
         data class WS(
             val host: String,
             val port: Int,
@@ -76,11 +87,12 @@ object Transport {
         val parsed = parseURI(uri)
         return when (parsed.scheme) {
             "tcp" -> Listener.Tcp(listenTcp(parsed))
-            "unix" -> throw UnsupportedOperationException(
-                "unix:// requires a Unix-domain capable gRPC transport runtime"
+            "unix" -> Listener.Unix(
+                channel = listenUnix(parsed),
+                path = parsed.path ?: error("unix path missing"),
             )
             "stdio" -> Listener.Stdio
-            "mem" -> Listener.Mem
+            "mem" -> Listener.Mem(MemListener())
             "ws", "wss" -> Listener.WS(
                 host = parsed.host ?: "0.0.0.0",
                 port = parsed.port ?: if (parsed.secure) 443 else 80,
@@ -91,12 +103,31 @@ object Transport {
         }
     }
 
+    fun dialUnix(uri: String): SocketChannel {
+        val parsed = parseURI(uri)
+        require(parsed.scheme == "unix") { "dialUnix expects unix:// URI: $uri" }
+        val path = parsed.path ?: error("unix path missing")
+        return SocketChannel.open(UnixDomainSocketAddress.of(path))
+    }
+
+    fun memDial(listener: Listener.Mem): MemConnection {
+        return listener.runtime.dial()
+    }
+
     private fun listenTcp(parsed: ParsedURI): ServerSocket {
         val host = parsed.host ?: "0.0.0.0"
         val port = parsed.port ?: 9090
         return ServerSocket().apply {
             reuseAddress = true
             bind(InetSocketAddress(host, port))
+        }
+    }
+
+    private fun listenUnix(parsed: ParsedURI): ServerSocketChannel {
+        val path = parsed.path ?: error("unix path missing")
+        Files.deleteIfExists(Path.of(path))
+        return ServerSocketChannel.open(StandardProtocolFamily.UNIX).apply {
+            bind(UnixDomainSocketAddress.of(path))
         }
     }
 
@@ -110,5 +141,39 @@ object Transport {
             return host to port
         }
         return addr to defaultPort
+    }
+
+    class MemListener {
+        private val serverQueue = LinkedBlockingQueue<MemConnection>()
+
+        fun dial(): MemConnection {
+            val clientIn = java.io.PipedInputStream(64 * 1024)
+            val serverOut = java.io.PipedOutputStream(clientIn)
+            val serverIn = java.io.PipedInputStream(64 * 1024)
+            val clientOut = java.io.PipedOutputStream(serverIn)
+
+            val client = MemConnection(clientIn, clientOut)
+            val server = MemConnection(serverIn, serverOut)
+            serverQueue.offer(server)
+            return client
+        }
+
+        fun accept(timeoutMs: Long): MemConnection {
+            return serverQueue.poll(timeoutMs, TimeUnit.MILLISECONDS)
+                ?: throw IllegalStateException("mem:// accept timed out")
+        }
+    }
+
+    data class MemConnection(
+        val input: InputStream,
+        val output: OutputStream,
+    ) : AutoCloseable {
+        override fun close() {
+            try {
+                input.close()
+            } finally {
+                output.close()
+            }
+        }
     }
 }
