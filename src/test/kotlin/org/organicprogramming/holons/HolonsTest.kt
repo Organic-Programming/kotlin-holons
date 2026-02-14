@@ -207,7 +207,7 @@ class HolonsTest {
             """
             #!/usr/bin/env bash
             set -euo pipefail
-            printf '%s\n' "$PWD" > "${pwdFile.absolutePath}"
+            printf '%s\n' "${'$'}PWD" > "${pwdFile.absolutePath}"
             printf '%s\n' "${'$'}{GOCACHE:-}" > "${gocacheFile.absolutePath}"
             : > "${argsFile.absolutePath}"
             for arg in "${'$'}@"; do
