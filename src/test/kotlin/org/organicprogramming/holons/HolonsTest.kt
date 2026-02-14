@@ -3,6 +3,7 @@ package org.organicprogramming.holons
 import java.io.File
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
+import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -145,4 +146,112 @@ class HolonsTest {
         assertFailsWith<IllegalArgumentException> { Identity.parseHolon(tmp.absolutePath) }
         tmp.delete()
     }
+
+    @Test fun certDeclaresEchoClientAndDialCapabilities() {
+        val cert = File("cert.json").readText()
+        assertTrue(cert.contains("\"echo_client\": \"./bin/echo-client\""))
+        assertTrue(cert.contains("\"grpc_dial_tcp\": true"))
+        assertTrue(cert.contains("\"grpc_dial_stdio\": true"))
+    }
+
+    @Test fun echoClientScriptUsesGoHelperAndDefaultGocache() {
+        val run = runEchoClientScript(
+            args = listOf("--message", "cert", "tcp://127.0.0.1:19090"),
+            gocache = null,
+        )
+
+        assertEquals(0, run.exitCode)
+        assertTrue(run.stdout.contains("\"status\":\"pass\""))
+        assertEquals(
+            File("..", "go-holons").canonicalPath,
+            File(run.workingDirectory).canonicalPath,
+        )
+        assertEquals("/tmp/go-cache", run.gocache)
+
+        assertEquals("run", run.arguments[0])
+        assertTrue(run.arguments[1].endsWith("/js-web-holons/cmd/echo-client-go/main.go"))
+        assertEquals("--sdk", run.arguments[2])
+        assertEquals("kotlin-holons", run.arguments[3])
+        assertEquals("--server-sdk", run.arguments[4])
+        assertEquals("go-holons", run.arguments[5])
+        assertEquals("--message", run.arguments[6])
+        assertEquals("cert", run.arguments[7])
+        assertEquals("tcp://127.0.0.1:19090", run.arguments[8])
+    }
+
+    @Test fun echoClientScriptPreservesProvidedGocache() {
+        val run = runEchoClientScript(
+            args = listOf("stdio://"),
+            gocache = "/tmp/kotlin-holons-custom-cache",
+        )
+
+        assertEquals(0, run.exitCode)
+        assertEquals("/tmp/kotlin-holons-custom-cache", run.gocache)
+    }
+
+    private fun runEchoClientScript(
+        args: List<String>,
+        gocache: String?,
+    ): ScriptRun {
+        val script = File("bin/echo-client")
+        assertTrue(script.exists(), "missing ${script.path}")
+        assertTrue(script.canExecute(), "not executable: ${script.path}")
+
+        val tmpDir = Files.createTempDirectory("kotlin-echo-client-test").toFile()
+        val argsFile = File(tmpDir, "args.txt")
+        val pwdFile = File(tmpDir, "pwd.txt")
+        val gocacheFile = File(tmpDir, "gocache.txt")
+        val fakeGo = File(tmpDir, "go")
+
+        fakeGo.writeText(
+            """
+            #!/usr/bin/env bash
+            set -euo pipefail
+            printf '%s\n' "$PWD" > "${pwdFile.absolutePath}"
+            printf '%s\n' "${'$'}{GOCACHE:-}" > "${gocacheFile.absolutePath}"
+            : > "${argsFile.absolutePath}"
+            for arg in "${'$'}@"; do
+              printf '%s\n' "${'$'}arg" >> "${argsFile.absolutePath}"
+            done
+            printf '%s\n' '{"status":"pass","sdk":"kotlin-holons","server_sdk":"go-holons"}'
+            """.trimIndent(),
+        )
+        fakeGo.setExecutable(true)
+
+        try {
+            val process = ProcessBuilder(listOf(script.absolutePath) + args)
+                .redirectErrorStream(true)
+                .directory(File(System.getProperty("user.dir")))
+                .apply {
+                    environment()["GO_BIN"] = fakeGo.absolutePath
+                    if (gocache == null) {
+                        environment().remove("GOCACHE")
+                    } else {
+                        environment()["GOCACHE"] = gocache
+                    }
+                }
+                .start()
+
+            val stdout = process.inputStream.bufferedReader(StandardCharsets.UTF_8).readText().trim()
+            val exitCode = process.waitFor()
+
+            return ScriptRun(
+                exitCode = exitCode,
+                stdout = stdout,
+                arguments = if (argsFile.exists()) argsFile.readLines() else emptyList(),
+                workingDirectory = if (pwdFile.exists()) pwdFile.readText().trim() else "",
+                gocache = if (gocacheFile.exists()) gocacheFile.readText().trim() else "",
+            )
+        } finally {
+            tmpDir.deleteRecursively()
+        }
+    }
+
+    private data class ScriptRun(
+        val exitCode: Int,
+        val stdout: String,
+        val arguments: List<String>,
+        val workingDirectory: String,
+        val gocache: String,
+    )
 }
