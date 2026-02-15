@@ -154,6 +154,13 @@ class HolonsTest {
         assertTrue(cert.contains("\"grpc_dial_stdio\": true"))
     }
 
+    @Test fun certDeclaresEchoServerAndListenCapabilities() {
+        val cert = File("cert.json").readText()
+        assertTrue(cert.contains("\"echo_server\": \"./bin/echo-server\""))
+        assertTrue(cert.contains("\"grpc_listen_tcp\": true"))
+        assertTrue(cert.contains("\"grpc_listen_stdio\": true"))
+    }
+
     @Test fun echoClientScriptUsesGoHelperAndDefaultGocache() {
         val run = runEchoClientScript(
             args = listOf("--message", "cert", "tcp://127.0.0.1:19090"),
@@ -189,11 +196,66 @@ class HolonsTest {
         assertEquals("/tmp/kotlin-holons-custom-cache", run.gocache)
     }
 
+    @Test fun echoServerScriptUsesGoHelperAndDefaultGocache() {
+        val run = runEchoServerScript(
+            args = listOf("--listen", "tcp://127.0.0.1:0"),
+            gocache = null,
+        )
+
+        assertEquals(0, run.exitCode)
+        assertEquals(
+            File("..", "go-holons").canonicalPath,
+            File(run.workingDirectory).canonicalPath,
+        )
+        assertEquals("/tmp/go-cache", run.gocache)
+
+        assertEquals("run", run.arguments[0])
+        assertEquals("./cmd/echo-server", run.arguments[1])
+        assertEquals("--sdk", run.arguments[2])
+        assertEquals("kotlin-holons", run.arguments[3])
+        assertEquals("--listen", run.arguments[4])
+        assertEquals("tcp://127.0.0.1:0", run.arguments[5])
+    }
+
+    @Test fun echoServerScriptPreservesServeModeArguments() {
+        val run = runEchoServerScript(
+            args = listOf("serve", "--listen", "stdio://", "--version", "0.2.0"),
+            gocache = "/tmp/kotlin-holons-custom-cache",
+        )
+
+        assertEquals(0, run.exitCode)
+        assertEquals("/tmp/kotlin-holons-custom-cache", run.gocache)
+        assertEquals("run", run.arguments[0])
+        assertEquals("./cmd/echo-server", run.arguments[1])
+        assertEquals("serve", run.arguments[2])
+        assertEquals("--sdk", run.arguments[3])
+        assertEquals("kotlin-holons", run.arguments[4])
+        assertEquals("--listen", run.arguments[5])
+        assertEquals("stdio://", run.arguments[6])
+        assertEquals("--version", run.arguments[7])
+        assertEquals("0.2.0", run.arguments[8])
+    }
+
     private fun runEchoClientScript(
         args: List<String>,
         gocache: String?,
     ): ScriptRun {
-        val script = File("bin/echo-client")
+        return runScript("bin/echo-client", args, gocache)
+    }
+
+    private fun runEchoServerScript(
+        args: List<String>,
+        gocache: String?,
+    ): ScriptRun {
+        return runScript("bin/echo-server", args, gocache)
+    }
+
+    private fun runScript(
+        scriptPath: String,
+        args: List<String>,
+        gocache: String?,
+    ): ScriptRun {
+        val script = File(scriptPath)
         assertTrue(script.exists(), "missing ${script.path}")
         assertTrue(script.canExecute(), "not executable: ${script.path}")
 

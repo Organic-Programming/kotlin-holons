@@ -1,7 +1,8 @@
 build/
 .gradle/
 bin/*
-!bin/echo-client
-bin/
+!bin/
+!bin/echo-server
+bin/echo-client
 
 *.class

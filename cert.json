@@ -3,12 +3,12 @@
   "lang": "kotlin",
   "version": "0.1.0",
   "executables": {
-    "echo_server": "",
+    "echo_server": "./bin/echo-server",
     "echo_client": "./bin/echo-client"
   },
   "capabilities": {
     "grpc_listen_tcp": true,
-    "grpc_listen_stdio": false,
+    "grpc_listen_stdio": true,
     "grpc_listen_unix": true,
     "grpc_listen_mem": true,
     "grpc_dial_tcp": true,
