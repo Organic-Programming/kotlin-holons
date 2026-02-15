@@ -152,6 +152,7 @@ class HolonsTest {
         assertTrue(cert.contains("\"echo_client\": \"./bin/echo-client\""))
         assertTrue(cert.contains("\"grpc_dial_tcp\": true"))
         assertTrue(cert.contains("\"grpc_dial_stdio\": true"))
+        assertTrue(cert.contains("\"grpc_dial_ws\": true"))
     }
 
     @Test fun certDeclaresEchoServerAndListenCapabilities() {
@@ -159,6 +160,12 @@ class HolonsTest {
         assertTrue(cert.contains("\"echo_server\": \"./bin/echo-server\""))
         assertTrue(cert.contains("\"grpc_listen_tcp\": true"))
         assertTrue(cert.contains("\"grpc_listen_stdio\": true"))
+    }
+
+    @Test fun certDeclaresHolonRpcServerExecutableAndCapability() {
+        val cert = File("cert.json").readText()
+        assertTrue(cert.contains("\"holon_rpc_server\": \"./bin/holon-rpc-server\""))
+        assertTrue(cert.contains("\"holon_rpc_server\": true"))
     }
 
     @Test fun echoClientScriptUsesGoHelperAndDefaultGocache() {
@@ -176,7 +183,7 @@ class HolonsTest {
         assertEquals("/tmp/go-cache", run.gocache)
 
         assertEquals("run", run.arguments[0])
-        assertTrue(run.arguments[1].endsWith("/js-web-holons/cmd/echo-client-go/main.go"))
+        assertTrue(run.arguments[1].endsWith("/kotlin-holons/cmd/echo-client-go/main.go"))
         assertEquals("--sdk", run.arguments[2])
         assertEquals("kotlin-holons", run.arguments[3])
         assertEquals("--server-sdk", run.arguments[4])
@@ -194,6 +201,16 @@ class HolonsTest {
 
         assertEquals(0, run.exitCode)
         assertEquals("/tmp/kotlin-holons-custom-cache", run.gocache)
+    }
+
+    @Test fun echoClientScriptForwardsWebSocketTarget() {
+        val run = runEchoClientScript(
+            args = listOf("--message", "cert", "ws://127.0.0.1:28080/grpc"),
+            gocache = null,
+        )
+
+        assertEquals(0, run.exitCode)
+        assertTrue(run.arguments.contains("ws://127.0.0.1:28080/grpc"))
     }
 
     @Test fun echoServerScriptUsesGoHelperAndDefaultGocache() {
@@ -236,6 +253,41 @@ class HolonsTest {
         assertEquals("0.2.0", run.arguments[8])
     }
 
+    @Test fun holonRpcServerScriptInjectsDefaultSdkAndDefaultGocache() {
+        val run = runHolonRpcServerScript(
+            args = listOf("ws://127.0.0.1:8080/rpc", "--once"),
+            gocache = null,
+        )
+
+        assertEquals(0, run.exitCode)
+        assertEquals(
+            File("..", "go-holons").canonicalPath,
+            File(run.workingDirectory).canonicalPath,
+        )
+        assertEquals("/tmp/go-cache", run.gocache)
+
+        assertEquals("run", run.arguments[0])
+        assertTrue(run.arguments[1].endsWith("/kotlin-holons/cmd/holon-rpc-server-go/main.go"))
+        assertEquals("--sdk", run.arguments[2])
+        assertEquals("kotlin-holons", run.arguments[3])
+        assertEquals("ws://127.0.0.1:8080/rpc", run.arguments[4])
+        assertEquals("--once", run.arguments[5])
+    }
+
+    @Test fun holonRpcServerScriptPreservesExplicitSdk() {
+        val run = runHolonRpcServerScript(
+            args = listOf("--sdk", "override-sdk", "ws://127.0.0.1:9090/rpc"),
+            gocache = "/tmp/kotlin-holons-custom-cache",
+        )
+
+        assertEquals(0, run.exitCode)
+        assertEquals("/tmp/kotlin-holons-custom-cache", run.gocache)
+        assertEquals("run", run.arguments[0])
+        assertTrue(run.arguments[1].endsWith("/kotlin-holons/cmd/holon-rpc-server-go/main.go"))
+        assertEquals("--sdk", run.arguments[2])
+        assertEquals("override-sdk", run.arguments[3])
+    }
+
     private fun runEchoClientScript(
         args: List<String>,
         gocache: String?,
@@ -248,6 +300,13 @@ class HolonsTest {
         gocache: String?,
     ): ScriptRun {
         return runScript("bin/echo-server", args, gocache)
+    }
+
+    private fun runHolonRpcServerScript(
+        args: List<String>,
+        gocache: String?,
+    ): ScriptRun {
+        return runScript("bin/holon-rpc-server", args, gocache)
     }
 
     private fun runScript(

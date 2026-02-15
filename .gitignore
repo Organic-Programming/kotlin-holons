@@ -3,6 +3,7 @@ build/
 bin/*
 !bin/
 !bin/echo-server
-bin/echo-client
+!bin/echo-client
+!bin/holon-rpc-server
 
 *.class
