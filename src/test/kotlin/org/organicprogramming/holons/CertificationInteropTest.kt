@@ -66,6 +66,135 @@ class CertificationInteropTest {
         }
     }
 
+    @Test fun echoServerSleepMsPropagatesDeadlineExceeded() {
+        val projectRoot = projectRoot()
+        val goHolonsDir = sdkRoot().resolve("go-holons")
+
+        val kotlinServer = ProcessBuilder(
+            projectRoot.resolve("bin/echo-server").absolutePath,
+            "--listen",
+            "tcp://127.0.0.1:0",
+            "--sleep-ms",
+            "5000",
+        )
+            .directory(projectRoot)
+            .redirectErrorStream(false)
+            .start()
+
+        try {
+            BufferedReader(InputStreamReader(kotlinServer.inputStream, StandardCharsets.UTF_8)).use { serverStdout ->
+                val serverURI = readLineWithTimeout(serverStdout, Duration.ofSeconds(20))
+                assertNotNull(serverURI, "kotlin echo-server did not emit listen URI")
+                assertTrue(serverURI.startsWith("tcp://"), "unexpected server URI: $serverURI")
+
+                val timeoutClient = ProcessBuilder(
+                    resolveGoBinary(),
+                    "run",
+                    "./cmd/echo-client",
+                    "--sdk",
+                    "go-holons",
+                    "--server-sdk",
+                    "kotlin-holons",
+                    "--message",
+                    "deadline-probe",
+                    "--timeout-ms",
+                    "2000",
+                    serverURI,
+                )
+                    .directory(goHolonsDir)
+                    .redirectErrorStream(false)
+                    .start()
+
+                assertTrue(timeoutClient.waitFor(20, TimeUnit.SECONDS), "deadline probe client did not exit")
+                val timeoutStdout = readAll(timeoutClient.inputStream).trim()
+                val timeoutStderr = readAll(timeoutClient.errorStream).trim()
+                assertTrue(
+                    timeoutClient.exitValue() != 0,
+                    "expected deadline probe failure\nstdout:\n$timeoutStdout\nstderr:\n$timeoutStderr",
+                )
+                assertTrue(
+                    timeoutStderr.contains("DeadlineExceeded") || timeoutStderr.contains("DEADLINE_EXCEEDED"),
+                    "expected deadline exceeded error\nstdout:\n$timeoutStdout\nstderr:\n$timeoutStderr",
+                )
+
+                val followupClient = ProcessBuilder(
+                    resolveGoBinary(),
+                    "run",
+                    "./cmd/echo-client",
+                    "--sdk",
+                    "go-holons",
+                    "--server-sdk",
+                    "kotlin-holons",
+                    "--message",
+                    "post-timeout",
+                    "--timeout-ms",
+                    "7000",
+                    serverURI,
+                )
+                    .directory(goHolonsDir)
+                    .redirectErrorStream(false)
+                    .start()
+
+                assertTrue(followupClient.waitFor(30, TimeUnit.SECONDS), "follow-up client did not exit")
+                val followupStdout = readAll(followupClient.inputStream).trim()
+                val followupStderr = readAll(followupClient.errorStream).trim()
+                assertEquals(
+                    0,
+                    followupClient.exitValue(),
+                    "follow-up request failed\nstdout:\n$followupStdout\nstderr:\n$followupStderr",
+                )
+                assertTrue(followupStdout.contains("\"status\":\"pass\""), followupStdout)
+            }
+        } finally {
+            destroyProcess(kotlinServer)
+        }
+    }
+
+    @Test fun echoServerRejectsOversizedMessageAndStaysAlive() {
+        val projectRoot = projectRoot()
+        val goHolonsDir = sdkRoot().resolve("go-holons")
+
+        val kotlinServer = ProcessBuilder(
+            projectRoot.resolve("bin/echo-server").absolutePath,
+            "--listen",
+            "tcp://127.0.0.1:0",
+        )
+            .directory(projectRoot)
+            .redirectErrorStream(false)
+            .start()
+
+        try {
+            BufferedReader(InputStreamReader(kotlinServer.inputStream, StandardCharsets.UTF_8)).use { serverStdout ->
+                val serverURI = readLineWithTimeout(serverStdout, Duration.ofSeconds(20))
+                assertNotNull(serverURI, "kotlin echo-server did not emit listen URI")
+                assertTrue(serverURI.startsWith("tcp://"), "unexpected server URI: $serverURI")
+
+                val oversizeProbe = ProcessBuilder(
+                    resolveGoBinary(),
+                    "run",
+                    projectRoot.resolve("cmd/large-ping-go/main.go").absolutePath,
+                    serverURI,
+                )
+                    .directory(goHolonsDir)
+                    .redirectErrorStream(false)
+                    .start()
+
+                assertTrue(oversizeProbe.waitFor(40, TimeUnit.SECONDS), "oversize probe did not exit")
+                val probeStdout = readAll(oversizeProbe.inputStream).trim()
+                val probeStderr = readAll(oversizeProbe.errorStream).trim()
+                assertEquals(
+                    0,
+                    oversizeProbe.exitValue(),
+                    "oversize probe failed\nstdout:\n$probeStdout\nstderr:\n$probeStderr",
+                )
+                assertTrue(probeStdout.contains("RESULT=RESOURCE_EXHAUSTED SMALL_OK"), probeStdout)
+                assertTrue(probeStdout.contains("SDK=kotlin-holons"), probeStdout)
+            }
+        } finally {
+            destroyProcess(kotlinServer)
+        }
+    }
+
     @Test fun holonRpcServerScriptHandlesEchoRoundTrip() = runBlocking {
         val projectRoot = projectRoot()
         val kotlinServer = ProcessBuilder(

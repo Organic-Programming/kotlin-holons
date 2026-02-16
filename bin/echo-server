@@ -4,6 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SDK_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 GO_HOLONS_DIR="${SDK_DIR}/../go-holons"
+HELPER_PATH="${SDK_DIR}/cmd/echo-server-go/main.go"
 PREFERRED_GO_BIN="/Users/bpds/go/go1.25.1/bin/go"
 
 resolve_go_bin() {
@@ -23,7 +24,7 @@ export GOCACHE="${GOCACHE:-/tmp/go-cache}"
 
 cd "${GO_HOLONS_DIR}"
 if [[ "${1:-}" == "serve" ]]; then
-  exec "${GO_CMD}" run ./cmd/echo-server serve --sdk kotlin-holons "${@:2}"
+  exec "${GO_CMD}" run "${HELPER_PATH}" serve --sdk kotlin-holons "${@:2}"
 fi
 
-exec "${GO_CMD}" run ./cmd/echo-server --sdk kotlin-holons "$@"
+exec "${GO_CMD}" run "${HELPER_PATH}" --sdk kotlin-holons "$@"

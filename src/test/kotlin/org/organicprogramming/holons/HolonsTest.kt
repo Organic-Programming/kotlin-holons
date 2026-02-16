@@ -160,6 +160,7 @@ class HolonsTest {
         assertTrue(cert.contains("\"echo_server\": \"./bin/echo-server\""))
         assertTrue(cert.contains("\"grpc_listen_tcp\": true"))
         assertTrue(cert.contains("\"grpc_listen_stdio\": true"))
+        assertTrue(cert.contains("\"grpc_reject_oversize\": true"))
     }
 
     @Test fun certDeclaresHolonRpcServerExecutableAndCapability() {
@@ -227,7 +228,7 @@ class HolonsTest {
         assertEquals("/tmp/go-cache", run.gocache)
 
         assertEquals("run", run.arguments[0])
-        assertEquals("./cmd/echo-server", run.arguments[1])
+        assertTrue(run.arguments[1].endsWith("/kotlin-holons/cmd/echo-server-go/main.go"))
         assertEquals("--sdk", run.arguments[2])
         assertEquals("kotlin-holons", run.arguments[3])
         assertEquals("--listen", run.arguments[4])
@@ -243,7 +244,7 @@ class HolonsTest {
         assertEquals(0, run.exitCode)
         assertEquals("/tmp/kotlin-holons-custom-cache", run.gocache)
         assertEquals("run", run.arguments[0])
-        assertEquals("./cmd/echo-server", run.arguments[1])
+        assertTrue(run.arguments[1].endsWith("/kotlin-holons/cmd/echo-server-go/main.go"))
         assertEquals("serve", run.arguments[2])
         assertEquals("--sdk", run.arguments[3])
         assertEquals("kotlin-holons", run.arguments[4])
