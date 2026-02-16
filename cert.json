@@ -1,36 +1,36 @@
 {
-  "sdk": "kotlin-holons",
-  "lang": "kotlin",
-  "version": "0.1.0",
-  "executables": {
-    "echo_server": "./bin/echo-server",
-    "echo_client": "./bin/echo-client",
-    "holon_rpc_server": "./bin/holon-rpc-server"
-  },
   "capabilities": {
-    "grpc_listen_tcp": true,
-    "grpc_listen_stdio": true,
-    "grpc_listen_unix": true,
-    "grpc_listen_mem": true,
-    "grpc_dial_tcp": true,
+    "bidirectional": true,
     "grpc_dial_stdio": true,
+    "grpc_dial_tcp": true,
     "grpc_dial_unix": true,
     "grpc_dial_ws": true,
+    "grpc_listen_mem": true,
+    "grpc_listen_stdio": true,
+    "grpc_listen_tcp": true,
+    "grpc_listen_unix": true,
     "holon_rpc_client": true,
     "holon_rpc_server": true,
-    "bidirectional": true,
-    "valence": "multi",
     "routing": [
       "unicast",
       "fanout",
       "broadcast-response",
       "full-broadcast"
-    ]
+    ],
+    "valence": "multi"
   },
+  "executables": {
+    "echo_client": "./bin/echo-client",
+    "echo_server": "./bin/echo-server",
+    "holon_rpc_server": "./bin/holon-rpc-server"
+  },
+  "lang": "kotlin",
   "last_certified": {
-    "commit": "01c48364b8da70d594d11ae9cd8095e2002036a3",
+    "commit": "a60b5aa42b0209bc326871cacedd8f945402568d",
     "date": "2026-02-16",
     "level": 0
   },
-  "role": "hub"
+  "role": "hub",
+  "sdk": "kotlin-holons",
+  "version": "0.1.0"
 }
