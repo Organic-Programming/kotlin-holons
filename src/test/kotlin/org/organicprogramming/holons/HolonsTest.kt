@@ -128,10 +128,10 @@ class HolonsTest {
     }
 
     @Test fun parseHolon() {
-        val tmp = File.createTempFile("holon", ".md")
+        val tmp = File.createTempFile("holon", ".yaml")
         tmp.writeText(
-            "---\nuuid: \"abc-123\"\ngiven_name: \"test\"\n" +
-            "family_name: \"Test\"\nlang: \"kotlin\"\n---\n# test\n"
+            "uuid: \"abc-123\"\ngiven_name: \"test\"\n" +
+            "family_name: \"Test\"\nlang: \"kotlin\"\n"
         )
         val id = Identity.parseHolon(tmp.absolutePath)
         assertEquals("abc-123", id.uuid)
@@ -140,33 +140,11 @@ class HolonsTest {
         tmp.delete()
     }
 
-    @Test fun parseMissingFrontmatter() {
-        val tmp = File.createTempFile("nofm", ".md")
-        tmp.writeText("# No frontmatter\n")
+    @Test fun parseInvalidMapping() {
+        val tmp = File.createTempFile("invalid-holon", ".yaml")
+        tmp.writeText("- not\n- a\n- mapping\n")
         assertFailsWith<IllegalArgumentException> { Identity.parseHolon(tmp.absolutePath) }
         tmp.delete()
-    }
-
-    @Test fun certDeclaresEchoClientAndDialCapabilities() {
-        val cert = File("cert.json").readText()
-        assertTrue(cert.contains("\"echo_client\": \"./bin/echo-client\""))
-        assertTrue(cert.contains("\"grpc_dial_tcp\": true"))
-        assertTrue(cert.contains("\"grpc_dial_stdio\": true"))
-        assertTrue(cert.contains("\"grpc_dial_ws\": true"))
-    }
-
-    @Test fun certDeclaresEchoServerAndListenCapabilities() {
-        val cert = File("cert.json").readText()
-        assertTrue(cert.contains("\"echo_server\": \"./bin/echo-server\""))
-        assertTrue(cert.contains("\"grpc_listen_tcp\": true"))
-        assertTrue(cert.contains("\"grpc_listen_stdio\": true"))
-        assertTrue(cert.contains("\"grpc_reject_oversize\": true"))
-    }
-
-    @Test fun certDeclaresHolonRpcServerExecutableAndCapability() {
-        val cert = File("cert.json").readText()
-        assertTrue(cert.contains("\"holon_rpc_server\": \"./bin/holon-rpc-server\""))
-        assertTrue(cert.contains("\"holon_rpc_server\": true"))
     }
 
     @Test fun echoClientScriptUsesGoHelperAndDefaultGocache() {

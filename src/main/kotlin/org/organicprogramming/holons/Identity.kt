@@ -21,18 +21,14 @@ data class HolonIdentity(
     val aliases: List<String> = emptyList(),
 )
 
-/** Parse a HOLON.md file. */
+/** Parse a holon.yaml file. */
 object Identity {
     @Suppress("UNCHECKED_CAST")
     fun parseHolon(path: String): HolonIdentity {
         val text = File(path).readText()
-        require(text.startsWith("---")) { "$path: missing YAML frontmatter" }
-
-        val endIdx = text.indexOf("---", 3)
-        require(endIdx >= 0) { "$path: unterminated frontmatter" }
-
-        val frontmatter = text.substring(3, endIdx).trim()
-        val data = Yaml().load<Map<String, Any?>>(frontmatter) ?: emptyMap()
+        val loaded = Yaml().load<Any?>(text)
+        require(loaded is Map<*, *>) { "$path: holon.yaml must be a YAML mapping" }
+        val data = loaded as Map<String, Any?>
 
         return HolonIdentity(
             uuid = data["uuid"]?.toString() ?: "",
