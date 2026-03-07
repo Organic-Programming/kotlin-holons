@@ -1,7 +1,8 @@
 # kotlin-holons
 
-**Kotlin SDK for Organic Programming** — transport, serve, identity,
-and Holon-RPC client utilities for building holons in Kotlin.
+**Kotlin SDK for Organic Programming** — transport primitives,
+serve-flag parsing, identity parsing, discovery, TCP-based `connect()`,
+and a Holon-RPC client.
 
 ## Test
 
@@ -16,37 +17,20 @@ JAVA_HOME=/opt/homebrew/opt/openjdk@21 gradle test -Dorg.gradle.java.home=/opt/h
 | `Transport` | `parseURI(uri)`, `listen(uri)`, `scheme(uri)` |
 | `Serve` | `parseFlags(args)` |
 | `Identity` | `parseHolon(path)` |
+| `Discover` | `discover(root)`, `discoverLocal()`, `discoverAll()`, `findBySlug(slug)`, `findByUUID(prefix)` |
+| `Connect` | `connect(target)`, `connect(target, options)`, `disconnect(channel)` |
 | `HolonRPCClient` | `connect(url)`, `invoke(method, params)`, `register(method, handler)`, `close()` |
 
-## Transport support
+## Current scope
 
-| Scheme | Support |
-|--------|---------|
-| `tcp://<host>:<port>` | Bound server socket (`Transport.Listener.Tcp`) |
-| `unix://<path>` | Native runtime listener + dial (`Transport.Listener.Unix`, `Transport.dialUnix`) |
-| `stdio://` | Listener marker (`Transport.Listener.Stdio`) |
-| `mem://` | Native in-process listener + dial (`Transport.Listener.Mem`, `Transport.memDial`) |
-| `ws://<host>:<port>` | Listener metadata (`Transport.Listener.WS`) |
-| `wss://<host>:<port>` | Listener metadata (`Transport.Listener.WS`) |
+- Runtime transports: `tcp://`, `unix://`, `mem://`
+- `stdio://`, `ws://`, and `wss://` are metadata-only at the transport layer
+- Discovery scans local, `$OPBIN`, and cache roots
+- `Connect.connect()` resolves direct targets or slugs and launches
+  daemons on ephemeral localhost TCP
 
-## Parity Notes vs Go Reference
+## Current gaps vs Go
 
-Implemented parity:
-
-- URI parsing and listener dispatch semantics
-- Native runtime listener for `tcp://`
-- Native runtime listener + dial for `unix://`
-- Native in-process listener + dial for `mem://`
-- Holon-RPC client protocol support over `ws://` / `wss://`
-- Standard serve flag parsing
-- HOLON identity parsing
-
-Not currently achievable in this minimal Kotlin core (justified gaps):
-
-- `stdio://` runtime listener:
-  - gRPC Kotlin/Java does not expose an official stdio transport equivalent to Go `net.Listener` patterns.
-- `ws://` / `wss://` runtime listener parity:
-  - No official WebSocket server transport for standard gRPC HTTP/2 framing in the core stack.
-  - Exposed as metadata only.
-- Transport-agnostic gRPC client helpers (`Dial`, `DialStdio`, `DialMem`, `DialWebSocket`):
-  - Requires a dedicated Kotlin/JVM gRPC adapter layer that is not yet included.
+- `connect()` is TCP-only today.
+- There is no full `serve.run(...)` lifecycle helper yet.
+- There is no Holon-RPC server module yet.
